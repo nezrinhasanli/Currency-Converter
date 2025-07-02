@@ -1,0 +1,78 @@
+package com.example.currencyconverter.ui
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.currencyconverter.network.repo.CurrencyRepository
+import com.example.currencyconverter.utils.AppResult
+import com.example.currencyconverter.utils.CurrencyEvent
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+import kotlin.math.round
+
+@HiltViewModel
+class CurrencyViewModel @Inject constructor(private val currencyRepository: CurrencyRepository) : ViewModel() {
+
+    private val _conversion = MutableStateFlow<CurrencyEvent>(CurrencyEvent.Empty)
+    val conversion: StateFlow<CurrencyEvent> = _conversion
+
+    val currencyList = listOf(
+        "AED", "AFN", "ALL", "AMD", "ANG", "AOA", "ARS", "AUD",
+        "AWG", "AZN", "BAM", "BBD", "BDT", "BGN", "BHD", "BIF",
+        "BMD", "BND", "BOB", "BRL", "BSD", "BTC", "BTN", "BWP",
+        "BYN", "BYR", "BZD", "CAD", "CDF", "CHF", "CLF", "CLP",
+        "CNY", "CNH", "COP", "CRC", "CUC", "CUP", "CVE", "CZK",
+        "DJF", "DKK", "DOP", "DZD", "EGP", "ERN", "ETB", "EUR",
+        "FJD", "FKP", "GBP", "GEL", "GGP", "GHS", "GIP", "GMD",
+        "GNF", "GTQ", "GYD", "HKD", "HNL", "HRK", "HTG", "HUF",
+        "IDR", "ILS", "IMP", "INR", "IQD", "IRR", "ISK", "JEP",
+        "JMD", "JOD", "JPY", "KES", "KGS", "KHR", "KMF", "KPW",
+        "KRW", "KWD", "KYD", "KZT", "LAK", "LBP", "LKR", "LRD",
+        "LSL", "LTL", "LVL", "LYD", "MAD", "MDL", "MGA", "MKD",
+        "MMK", "MNT", "MOP", "MRU", "MUR", "MVR", "MWK", "MXN",
+        "MYR", "MZN", "NAD", "NGN", "NIO", "NOK", "NPR", "NZD",
+        "OMR", "PAB", "PEN", "PGK", "PHP", "PKR", "PLN", "PYG",
+        "QAR", "RON", "RSD", "RUB", "RWF", "SAR", "SBD", "SCR",
+        "SDG", "SEK", "SGD", "SHP", "SLE", "SLL", "SOS", "SRD",
+        "STD", "SVC", "SYP", "SZL", "THB", "TJS", "TMT", "TND",
+        "TOP", "TRY", "TTD", "TWD", "TZS", "UAH", "UGX", "USD",
+        "UYU", "UZS", "VES", "VND", "VUV", "WST", "XAF", "XAG",
+        "XAU", "XCD", "XDR", "XOF", "XPF", "YER", "ZAR", "ZMK",
+        "ZMW", "ZWL"
+    )
+
+    fun convert(
+        amountStr: String,
+        fromCurrency: String,
+        toCurrency: String
+    ) {
+        val fromAmount = amountStr.toFloatOrNull()
+        if (fromAmount == null) {
+            _conversion.value = CurrencyEvent.Failure("Not a valid amount")
+            return
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            _conversion.value = CurrencyEvent.Loading
+
+            when (val ratesResponse = currencyRepository.getRates(fromCurrency)) {
+                is AppResult.Error -> _conversion.value = CurrencyEvent.Failure(ratesResponse.message ?: "Unknown error")
+                is AppResult.Success -> {
+                    val rates = ratesResponse.data!!.conversionRates
+                    val rate = rates[toCurrency]
+                    if (rate == null) {
+                        _conversion.value = CurrencyEvent.Failure("Unexpected error: rate not found")
+                    } else {
+                        val convertedCurrency = round(fromAmount * rate * 100) / 100
+                        _conversion.value = CurrencyEvent.Success(
+                            "$fromAmount $fromCurrency = $convertedCurrency $toCurrency"
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
