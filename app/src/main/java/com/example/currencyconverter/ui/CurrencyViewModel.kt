@@ -1,5 +1,6 @@
 package com.example.currencyconverter.ui
 
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.currencyconverter.network.repo.CurrencyRepository
@@ -18,7 +19,7 @@ class CurrencyViewModel @Inject constructor(private val currencyRepository: Curr
 
     private val _conversion = MutableStateFlow<CurrencyEvent>(CurrencyEvent.Empty)
     val conversion: StateFlow<CurrencyEvent> = _conversion
-
+    val amount = mutableStateOf("")
     val currencyList = listOf(
         "AED", "AFN", "ALL", "AMD", "ANG", "AOA", "ARS", "AUD",
         "AWG", "AZN", "BAM", "BBD", "BDT", "BGN", "BHD", "BIF",
@@ -44,17 +45,12 @@ class CurrencyViewModel @Inject constructor(private val currencyRepository: Curr
         "ZMW", "ZWL"
     )
 
-    fun convert(
-        amountStr: String,
-        fromCurrency: String,
-        toCurrency: String
-    ) {
-        val fromAmount = amountStr.toFloatOrNull()
+    fun convert(fromCurrency: String, toCurrency: String) {
+        val fromAmount = amount.value.toFloatOrNull()
         if (fromAmount == null) {
             _conversion.value = CurrencyEvent.Failure("Not a valid amount")
             return
         }
-
         viewModelScope.launch(Dispatchers.IO) {
             _conversion.value = CurrencyEvent.Loading
 
@@ -67,12 +63,14 @@ class CurrencyViewModel @Inject constructor(private val currencyRepository: Curr
                         _conversion.value = CurrencyEvent.Failure("Unexpected error: rate not found")
                     } else {
                         val convertedCurrency = round(fromAmount * rate * 100) / 100
-                        _conversion.value = CurrencyEvent.Success(
-                            "$fromAmount $fromCurrency = $convertedCurrency $toCurrency"
-                        )
+                        _conversion.value = CurrencyEvent.Success("$convertedCurrency")
                     }
                 }
             }
         }
+    }
+
+    fun updateAmount(input: String){
+        amount.value = input.filter { it.isDigit() }
     }
 }
