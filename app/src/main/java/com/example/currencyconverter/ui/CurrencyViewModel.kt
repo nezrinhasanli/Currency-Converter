@@ -20,6 +20,8 @@ class CurrencyViewModel @Inject constructor(private val currencyRepository: Curr
     private val _conversion = MutableStateFlow<CurrencyEvent>(CurrencyEvent.Empty)
     val conversion: StateFlow<CurrencyEvent> = _conversion
     val amount = mutableStateOf("")
+    private val _rateText = MutableStateFlow("")
+    val rateText: StateFlow<String> = _rateText
     val currencyList = listOf(
         "AED", "AFN", "ALL", "AMD", "ANG", "AOA", "ARS", "AUD",
         "AWG", "AZN", "BAM", "BBD", "BDT", "BGN", "BHD", "BIF",
@@ -55,15 +57,20 @@ class CurrencyViewModel @Inject constructor(private val currencyRepository: Curr
             _conversion.value = CurrencyEvent.Loading
 
             when (val ratesResponse = currencyRepository.getRates(fromCurrency)) {
-                is AppResult.Error -> _conversion.value = CurrencyEvent.Failure(ratesResponse.message ?: "Unknown error")
+                is AppResult.Error -> {
+                    _conversion.value = CurrencyEvent.Failure(ratesResponse.message ?: "Unknown error")
+                    _rateText.value = ""
+                }
                 is AppResult.Success -> {
                     val rates = ratesResponse.data!!.conversionRates
                     val rate = rates[toCurrency]
                     if (rate == null) {
                         _conversion.value = CurrencyEvent.Failure("Unexpected error: rate not found")
+                        _rateText.value = ""
                     } else {
                         val convertedCurrency = round(fromAmount * rate * 100) / 100
-                        _conversion.value = CurrencyEvent.Success("$convertedCurrency")
+                        _conversion.value = CurrencyEvent.Success(resultText = "$convertedCurrency")
+                        _rateText.value = "1 $fromCurrency = ${"%.4f".format(rate)} $toCurrency"
                     }
                 }
             }
